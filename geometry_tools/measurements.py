@@ -5,8 +5,8 @@ These are the main functions that LLM-generated code will call.
 
 import numpy as np
 from typing import Dict, List, Optional, Union
-from preprocessing import load_image, preprocess_for_line_detection
-from line_detection import detect_and_filter_lines
+from .preprocessing import load_image, preprocess_for_line_detection
+from .line_detection import detect_and_filter_lines
 
 
 def measure_line_length(image: Union[str, np.ndarray], 

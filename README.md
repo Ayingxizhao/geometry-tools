@@ -52,14 +52,6 @@ Auto-detect and compare all lines in the image.
 ### `answer_comparison_question(image, question)`
 Natural language interface for line comparisons.
 
-## 🎯 Features
-
-- **~99% accurate** on clean synthetic images
-- **2-3px error** typical (due to line rendering anti-aliasing)
-- **Handles 360p+ resolution** effectively
-- **Müller-Lyer illusion support** with test image generation
-- **Simple API** designed for LLM code generation
-
 ## 📁 Project Structure
 
 ```
@@ -72,50 +64,6 @@ geometry_tools/
 └── docs/
     └── PROJECT_SUMMARY.md   # Detailed implementation notes
 ```
-
-## 🔧 Technical Details
-
-### Detection Pipeline
-1. **Preprocessing** - Grayscale conversion, Gaussian blur, Canny edge detection
-2. **Line Detection** - Probabilistic Hough Transform, filtering, and merging
-3. **Measurement** - Euclidean distance calculation with tolerance-based comparison
-
-### Key Parameters
-- `tolerance`: 0.05 (5%) - Lines within 5% are considered "equal"
-- `min_line_length`: 30px - Minimum line length to detect
-- `angle_tolerance`: 15° - Maximum deviation from horizontal
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-python -m pytest geometry_tools/tests/
-
-# Run examples
-python example_usage.py
-```
-
-## 📊 Performance
-
-| Metric | Value |
-|--------|-------|
-| Accuracy | ~99% (synthetic) |
-| Speed | <100ms per image |
-| Min resolution | 360p |
-| Dependencies | opencv-python, numpy |
-
-## 🤝 Contributing
-
-This project is designed for integration with LLM systems (particularly Qwen 3VL) for visual reasoning tasks.
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
-
-## 👥 Authors
-
-- Andrew Y. Zhao - Initial implementation
-
 ---
 
 **Built with OpenCV and designed for neuro-symbolic visual reasoning.**
