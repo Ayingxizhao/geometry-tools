@@ -9,11 +9,11 @@ from typing import List, Dict, Tuple, Optional
 
 
 def detect_lines_hough(edges: np.ndarray,
-                       rho: float = 1,
+                       rho: float = 2,
                        theta: float = np.pi/180,
-                       threshold: int = 50,
-                       min_line_length: int = 30,
-                       max_line_gap: int = 10) -> Optional[np.ndarray]:
+                       threshold: int = 30,
+                       min_line_length: int = 50,
+                       max_line_gap: int = 20) -> Optional[np.ndarray]:
     """
     Detect lines using Probabilistic Hough Transform.
     
@@ -92,14 +92,16 @@ def get_line_properties(line: np.ndarray) -> Dict:
 
 
 def filter_horizontal_lines(lines: np.ndarray, 
-                           angle_tolerance: float = 15.0) -> List[np.ndarray]:
+                           angle_tolerance: float = 5.0,
+                           min_length: float = 100.0) -> List[np.ndarray]:
     """
-    Filter to keep only approximately horizontal lines.
+    Filter to keep only approximately horizontal lines above minimum length.
     Useful for Müller-Lyer illusion where main shafts are horizontal.
     
     Args:
         lines: Array of detected lines
         angle_tolerance: Maximum deviation from horizontal (in degrees)
+        min_length: Minimum line length to keep (pixels)
         
     Returns:
         List of horizontal lines
@@ -112,24 +114,25 @@ def filter_horizontal_lines(lines: np.ndarray,
     for line in lines:
         coords = line[0]
         angle = calculate_line_angle(coords)
+        length = calculate_line_length(coords)
         
-        # Check if close to 0° or 180° (horizontal)
-        if angle < angle_tolerance or angle > (180 - angle_tolerance):
+        # Check if close to 0° or 180° (horizontal) AND above minimum length
+        if (angle < angle_tolerance or angle > (180 - angle_tolerance)) and length >= min_length:
             horizontal_lines.append(coords)
     
     return horizontal_lines
 
 
 def merge_similar_lines(lines: List[np.ndarray],
-                       distance_threshold: float = 10.0,
+                       distance_threshold: float = 100.0,
                        angle_threshold: float = 5.0) -> List[np.ndarray]:
     """
-    Merge lines that are very close and parallel.
-    Helps reduce duplicate detections.
+    Merge lines that are collinear and overlapping.
+    Helps reduce duplicate detections by combining fragments of the same line.
     
     Args:
         lines: List of line coordinates
-        distance_threshold: Maximum distance between midpoints to merge
+        distance_threshold: Maximum distance between line midpoints to consider merging
         angle_threshold: Maximum angle difference to merge
         
     Returns:
@@ -157,22 +160,106 @@ def merge_similar_lines(lines: List[np.ndarray],
                 
             prop2 = get_line_properties(line2)
             
-            # Check if similar
+            # Check if similar angle (collinear)
             angle_diff = abs(prop1['angle'] - prop2['angle'])
-            midpoint_dist = np.sqrt(
-                (prop1['midpoint'][0] - prop2['midpoint'][0])**2 +
-                (prop1['midpoint'][1] - prop2['midpoint'][1])**2
-            )
             
-            if angle_diff < angle_threshold and midpoint_dist < distance_threshold:
-                group.append(line2)
-                used.add(j)
+            # For horizontal lines, also check y-coordinates are close
+            y_diff = abs(prop1['midpoint'][1] - prop2['midpoint'][1])
+            
+            # Check if lines are on same horizontal line and have similar angle
+            if angle_diff < angle_threshold and y_diff < 20:  # 20px tolerance for y-coordinate
+                # Additional check: see if projections overlap
+                if lines_overlap_horizontally(line1, line2):
+                    group.append(line2)
+                    used.add(j)
         
-        # Merge group into single line (use longest)
-        longest = max(group, key=calculate_line_length)
-        merged.append(longest)
+        # Merge group into single line by combining endpoints
+        if len(group) > 1:
+            merged_line = merge_horizontal_group(group)
+            merged.append(merged_line)
+        else:
+            merged.append(group[0])
     
     return merged
+
+
+def lines_overlap_horizontally(line1: np.ndarray, line2: np.ndarray) -> bool:
+    """
+    Check if two horizontal line segments overlap or are close.
+    
+    Args:
+        line1, line2: Line coordinates [x1, y1, x2, y2]
+        
+    Returns:
+        True if lines overlap or are within 50px of each other
+    """
+    x1_min, x1_max = sorted([line1[0], line1[2]])
+    x2_min, x2_max = sorted([line2[0], line2[2]])
+    
+    # Check if intervals overlap or are close
+    gap = min(x1_max, x2_max) - max(x1_min, x2_min)
+    return gap > -50  # Allow 50px gap between fragments
+
+
+def merge_horizontal_group(group: List[np.ndarray]) -> np.ndarray:
+    """
+    Merge a group of horizontal line segments into one continuous line.
+    
+    Args:
+        group: List of collinear horizontal line segments
+        
+    Returns:
+        Merged line coordinates
+    """
+    # Find the min and max x coordinates across all segments
+    all_x = []
+    y_coords = []
+    
+    for line in group:
+        all_x.extend([line[0], line[2]])
+        y_coords.extend([line[1], line[3]])
+    
+    # Use the leftmost and rightmost points
+    min_x = min(all_x)
+    max_x = max(all_x)
+    
+    # Use average y-coordinate for the merged line
+    avg_y = sum(y_coords) / len(y_coords)
+    
+    return np.array([min_x, avg_y, max_x, avg_y])
+
+
+def assign_spatial_line_ids(lines: List[np.ndarray]) -> List[Dict]:
+    """
+    Assign line IDs based on spatial position (top-to-bottom, then left-to-right).
+    This ensures consistent line numbering regardless of detection order.
+    
+    Args:
+        lines: List of line coordinates
+        
+    Returns:
+        List of line dictionaries with spatial IDs
+    """
+    if not lines:
+        return []
+    
+    # Get properties for all lines
+    line_props = []
+    for line in lines:
+        props = get_line_properties(line)
+        line_props.append(props)
+    
+    # Sort by y-coordinate (top to bottom), then by x-coordinate (left to right)
+    # Use midpoint for sorting
+    sorted_lines = sorted(line_props, key=lambda x: (x['midpoint'][1], x['midpoint'][0]))
+    
+    # Assign IDs based on spatial order
+    results = []
+    for i, props in enumerate(sorted_lines):
+        props['id'] = f"line_{i}"
+        results.append(props)
+    
+    return results
 
 
 def detect_and_filter_lines(edges: np.ndarray,
@@ -206,11 +293,7 @@ def detect_and_filter_lines(edges: np.ndarray,
     if merge_duplicates and lines:
         lines = merge_similar_lines(lines)
     
-    # Get properties for each line
-    results = []
-    for i, line in enumerate(lines):
-        props = get_line_properties(line)
-        props['id'] = f"line_{i}"
-        results.append(props)
+    # Assign spatial IDs and get properties
+    results = assign_spatial_line_ids(lines)
     
     return results
