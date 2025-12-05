@@ -49,7 +49,11 @@ from .measurements import (
     measure_line_length,
     is_line_longer,
     compare_all_lines,
-    answer_comparison_question
+    answer_comparison_question,
+    detect_and_classify_triangles,
+    is_valid_equilateral,
+    is_valid_right_triangle,
+    answer_triangle_question
 )
 
 # Import utility functions
@@ -71,6 +75,12 @@ __all__ = [
     'measure_line_length',
     'compare_all_lines',
     'answer_comparison_question',
+    
+    # Triangle detection functions (for LLM code generation)
+    'detect_and_classify_triangles',
+    'is_valid_equilateral',
+    'is_valid_right_triangle',
+    'answer_triangle_question',
     
     # Preprocessing
     'load_image',
