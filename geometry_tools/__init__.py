@@ -53,7 +53,10 @@ from .measurements import (
     detect_and_classify_triangles,
     is_valid_equilateral,
     is_valid_right_triangle,
-    answer_triangle_question
+    answer_triangle_question,
+    compare_shapes_in_image,
+    is_shape_larger,
+    answer_shape_comparison_question
 )
 
 # Import utility functions
@@ -81,6 +84,11 @@ __all__ = [
     'is_valid_equilateral',
     'is_valid_right_triangle',
     'answer_triangle_question',
+    
+    # Shape comparison functions (for LLM code generation)
+    'compare_shapes_in_image',
+    'is_shape_larger',
+    'answer_shape_comparison_question',
     
     # Preprocessing
     'load_image',

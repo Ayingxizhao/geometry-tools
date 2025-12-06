@@ -1,6 +1,6 @@
 # Geometry Tools API
 
-A computer vision package for visual geometry reasoning, supporting both line comparison and triangle detection tasks.
+A computer vision package for visual geometry reasoning, supporting line comparison, triangle detection, and shape size comparison tasks.
 
 ## Quick Start
 
@@ -13,7 +13,12 @@ from geometry_tools import (
     # Triangle detection (vision_2d_Check_Triangles)
     detect_and_classify_triangles,
     is_valid_equilateral,
-    is_valid_right_triangle
+    is_valid_right_triangle,
+    
+    # Shape comparison (vision_2d_Compare_Size)
+    compare_shapes_in_image,
+    is_shape_larger,
+    answer_shape_comparison_question
 )
 
 # Line comparison
@@ -23,6 +28,10 @@ print(f"Answer: {result['answer_text']}")
 # Triangle detection
 result = detect_and_classify_triangles('triangle.png')
 print(f"Found {result['num_triangles']} triangles")
+
+# Shape comparison
+result = compare_shapes_in_image('shapes.png')
+print(f"Shape 1 larger: {result['is_shape_1_larger']} (ratio: {result['area_ratio']:.2f})")
 ```
 
 ## Installation
@@ -45,14 +54,23 @@ conda activate contentguard
 - `is_valid_right_triangle(image, triangle_id)` - Validate right triangles
 - `answer_triangle_question(image, question)` - Natural language interface
 
+### Shape Comparison
+- `compare_shapes_in_image(image)` - Detect and compare sizes of shapes (shape 1 vs shape 2)
+- `is_shape_larger(image, expected_larger)` - Validate if left shape is larger than right shape
+- `answer_shape_comparison_question(image, question)` - Natural language interface for size questions
+
 ## Testing
 
 ```bash
-# Run batch validation (99% accuracy on vision_2d_Check_Triangles dataset)
+# Triangle detection validation (99% accuracy on vision_2d_Check_Triangles dataset)
 python -m tests.test_batch_validation
+
+# Shape comparison validation (100% accuracy on vision_2d_Compare_Size dataset)
+python -m tests.test_shape_batch_validation
 
 # Generate visual debug images
 python -m examples.visualize_triangles
+python -m examples.visualize_shapes
 ```
 
 ## Documentation

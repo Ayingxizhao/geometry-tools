@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Union
 from .preprocessing import load_image, preprocess_for_line_detection
 from .line_detection import detect_and_filter_lines
 from .triangle_detection import detect_and_classify_triangles as detect_triangles_internal, validate_triangle
+from .shape_detection import detect_and_classify_shapes, compare_shape_sizes, validate_shape_comparison
 
 
 def measure_line_length(image: Union[str, np.ndarray], 
@@ -527,3 +528,204 @@ def answer_triangle_question(image: Union[str, np.ndarray],
             result['natural_answer'] = f"No, this is not a valid {expected_type} triangle."
     
     return result
+
+
+def compare_shapes_in_image(image: Union[str, np.ndarray], 
+                           min_area: float = 500.0,
+                           max_area: float = 50000.0) -> Dict:
+    """
+    Detect and compare sizes of shapes in an image (shape 1 vs shape 2).
+    
+    Args:
+        image: Image path (str) or numpy array
+        min_area: Minimum shape area to consider
+        max_area: Maximum shape area to consider
+    
+    Returns:
+        Dictionary with comparison results:
+        {
+            'success': bool,
+            'num_shapes': int,
+            'shapes': [...],
+            'shape_1': {...},
+            'shape_2': {...},
+            'is_shape_1_larger': bool,
+            'area_ratio': float,
+            'area_difference': float
+        }
+    """
+    try:
+        # Load image if path provided
+        if isinstance(image, str):
+            image_array = load_image(image)
+            if image_array is None:
+                return {
+                    'success': False,
+                    'error': "Failed to load image",
+                    'natural_answer': "I couldn't analyze the shapes: failed to load image",
+                    'num_shapes': 0,
+                    'shapes': []
+                }
+        else:
+            image_array = image
+        
+        # Detect shapes
+        detection_result = detect_and_classify_shapes(image_array, min_area, max_area)
+        
+        if not detection_result['success']:
+            return {
+                'success': False,
+                'error': detection_result['error'],
+                'num_shapes': 0,
+                'shapes': []
+            }
+        
+        # Compare sizes
+        comparison_result = compare_shape_sizes(detection_result['shapes'])
+        
+        if not comparison_result['success']:
+            return {
+                'success': False,
+                'error': comparison_result['error'],
+                'num_shapes': detection_result['num_shapes'],
+                'shapes': detection_result['shapes']
+            }
+        
+        # Combine results
+        return {
+            'success': True,
+            'num_shapes': detection_result['num_shapes'],
+            'shapes': detection_result['shapes'],
+            'shape_1': comparison_result['shape_1'],
+            'shape_2': comparison_result['shape_2'],
+            'is_shape_1_larger': comparison_result['is_shape_1_larger'],
+            'area_ratio': comparison_result['area_ratio'],
+            'area_difference': comparison_result['area_difference']
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Error in shape comparison: {str(e)}",
+            'num_shapes': 0,
+            'shapes': []
+        }
+
+
+def is_shape_larger(image: Union[str, np.ndarray], 
+                   expected_larger: bool = True,
+                   min_area: float = 500.0,
+                   max_area: float = 50000.0) -> Dict:
+    """
+    Validate if the left shape (shape 1) is larger than the right shape (shape 2).
+    
+    Args:
+        image: Image path (str) or numpy array
+        expected_larger: Expected result (True if shape 1 should be larger)
+        min_area: Minimum shape area to consider
+        max_area: Maximum shape area to consider
+    
+    Returns:
+        Dictionary with validation results:
+        {
+            'success': bool,
+            'is_valid': bool,
+            'shape_1_larger': bool,
+            'expected_larger': bool,
+            'area_ratio': float,
+            'shapes': [...]
+        }
+    """
+    try:
+        # Load image if path provided
+        if isinstance(image, str):
+            image_array = load_image(image)
+            if image_array is None:
+                return {
+                    'success': False,
+                    'error': "Failed to load image",
+                    'is_valid': False
+                }
+        else:
+            image_array = image
+        
+        # Validate shape comparison
+        validation_result = validate_shape_comparison(image_array, expected_larger, min_area, max_area)
+        
+        return validation_result
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Error in shape validation: {str(e)}",
+            'is_valid': False
+        }
+
+
+def answer_shape_comparison_question(image: Union[str, np.ndarray], 
+                                    question: str,
+                                    min_area: float = 500.0,
+                                    max_area: float = 50000.0) -> Dict:
+    """
+    Natural language interface for shape size comparison questions.
+    
+    Args:
+        image: Image path (str) or numpy array
+        question: Question about shape comparison (e.g., "Is the left shape larger?")
+        min_area: Minimum shape area to consider
+        max_area: Maximum shape area to consider
+    
+    Returns:
+        Dictionary with natural language answer and technical details
+    """
+    try:
+        # Parse question to determine expected comparison
+        question_lower = question.lower()
+        
+        # Determine expected result from question
+        if any(word in question_lower for word in ['larger', 'bigger', 'greater']):
+            expected_larger = True
+        elif any(word in question_lower for word in ['smaller', 'less', 'little']):
+            expected_larger = False
+        else:
+            # Default to checking if left shape is larger
+            expected_larger = True
+        
+        # Get comparison result
+        comparison_result = compare_shapes_in_image(image, min_area, max_area)
+        
+        if not comparison_result['success']:
+            return {
+                'success': False,
+                'error': comparison_result['error'],
+                'natural_answer': f"I couldn't analyze the shapes: {comparison_result['error']}"
+            }
+        
+        # Generate natural language answer
+        shape_1_larger = comparison_result['is_shape_1_larger']
+        shape_1_type = comparison_result['shape_1']['type']
+        shape_2_type = comparison_result['shape_2']['type']
+        area_ratio = comparison_result['area_ratio']
+        
+        if expected_larger:
+            if shape_1_larger:
+                answer = f"Yes, the left {shape_1_type} is larger than the right {shape_2_type} (area ratio: {area_ratio:.2f})."
+            else:
+                answer = f"No, the left {shape_1_type} is not larger than the right {shape_2_type} (area ratio: {area_ratio:.2f})."
+        else:
+            if not shape_1_larger:
+                answer = f"Yes, the left {shape_1_type} is smaller than the right {shape_2_type} (area ratio: {area_ratio:.2f})."
+            else:
+                answer = f"No, the left {shape_1_type} is not smaller than the right {shape_2_type} (area ratio: {area_ratio:.2f})."
+        
+        comparison_result['natural_answer'] = answer
+        comparison_result['question'] = question
+        
+        return comparison_result
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Error answering shape comparison question: {str(e)}",
+            'natural_answer': f"I couldn't answer your question about the shapes: {str(e)}"
+        }
